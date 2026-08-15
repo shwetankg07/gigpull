@@ -163,9 +163,18 @@ respected for all HTML fetching.
 
 ### 4. Score
 
-A deterministic weighted sum over independent axes. Not an LLM judgement — when a
-lead ranks wrongly, the operator must be able to see which axis caused it and change
-one number.
+Scoring runs in two phases: a cheap deterministic pass over every company, then an
+LLM quality pass over only the top of that ranking. This is a retrieve-then-rerank
+arrangement, and each phase does the part it is actually good at.
+
+#### 4a. Deterministic ranking (all companies)
+
+A weighted sum over independent axes. Deliberately not an LLM judgement at this
+stage, for three reasons: an LLM would give different scores for the same company on
+two runs, making the shortlist shuffle for no reason; when a bad lead ranks first
+there would be no way to see why; and re-scoring is the inner loop of weight tuning —
+the same corpus gets re-scored dozens of times, which is instant and free
+deterministically and slow and paid otherwise.
 
 | Axis | Meaning | Local signals | Startup signals |
 |---|---|---|---|
@@ -183,12 +192,36 @@ Weights are initially guesses. The tracker records a thumbs up/down per lead; af
 roughly fifty labels the weights get a first real tuning pass. This is expected work,
 not a failure.
 
+#### 4b. LLM rerank (top N only, default 30)
+
+The deterministic pass cannot recognise that a company is a bad lead for reasons no
+axis encodes. A government office, a temple, a hospital, or a national chain's
+franchise outlet can all score highly on reviews and website absence while being
+useless to approach. The rerank catches exactly that class of error.
+
+For each of the top N companies the LLM receives the stored signals and probe results
+and returns three fields: `verdict` (`keep` | `drop`), a one-line `reason`, and an
+optional `adjustment` in the range -20 to +20 applied to the deterministic total. The
+`reason` is stored whether the verdict is keep or drop, so a wrong drop is visible
+rather than silent.
+
+Scoped to the top N because cost scales with the number of calls: 30 calls per run
+rather than one per company across the whole corpus. N is configurable. Rerank
+results are cached against the company's signal set, so a re-run with unchanged
+signals costs nothing.
+
+The deterministic total is always retained alongside the adjusted one. If the rerank
+is unavailable — API error, rate limit, no key configured — the run proceeds on
+deterministic scores alone and says so in the run summary. The rerank improves the
+shortlist; it is never required to produce one.
+
 ### 5. Brief
 
-Per lead, one short block assembled from stored signals and defects. The LLM's job is
-phrasing only — every fact in a brief traces to a row in `signals` or `probes`. It
-does not infer, estimate, or embellish, and a brief with no concrete facts is
-suppressed rather than padded.
+Per lead, one short block assembled from stored signals and defects. At this stage the
+LLM's job is phrasing only — every fact in a brief traces to a row in `signals` or
+`probes`. It does not infer, estimate, or embellish, and a brief with no concrete
+facts is suppressed rather than padded. Judgement belongs to the rerank in 4b; the
+brief stage only writes down what is already stored.
 
 ```
 Anand Sweets, Indiranagar — 4.5★, 892 reviews, no website
@@ -214,7 +247,9 @@ companies   id, identity_key (unique), mode, name, city, category,
 signals     id, company_id, source, kind, value_json, observed_at
 probes      id, company_id, kind, ok, result_json, ran_at, expires_at
 contacts    id, company_id, type, value, source
-scores      id, company_id, total, breakdown_json, weights_version, scored_at
+scores      id, company_id, total, breakdown_json, weights_version, scored_at,
+            rerank_verdict, rerank_reason, rerank_adjustment, adjusted_total,
+            reranked_at, rerank_signal_hash
 leads       id, company_id, status, brief_md, rating,
             contacted_at, follow_up_at, notes
 runs        id, collector, mode, started_at, finished_at, ok, item_count, error
@@ -243,15 +278,47 @@ later dashboard.
 `drizzle-orm` is chosen so that moving to Postgres or Neon later — if a hosted
 dashboard is ever wanted — is a driver change rather than a rewrite.
 
-### External credentials
+### External credentials and running cost
 
 | Key | Cost | Notes |
 |---|---|---|
-| Google Places API (New) | free monthly credit, then per-lookup | requires a GCP project with billing enabled — **operator action required** |
+| Google Places API (New) | 1,000 free calls/month, then ~$35/1,000 | requires a GCP project with billing enabled — **operator action required** |
 | Meta Ad Library | free | requires a Meta developer app |
-| Anthropic API | usage-based | extraction and brief phrasing only |
+| Anthropic API | usage-based, roughly $5–20/month | extraction, rerank, and brief phrasing |
 | GitHub token | free | raises rate limits |
 | Product Hunt token | free | developer account |
+
+#### The Places field mask determines the price tier
+
+Google retired the universal $200 monthly credit in March 2025 and replaced it with
+per-SKU free tiers. Which tier a request falls into is decided by the fields it asks
+for, so the field mask is a cost decision, not a convenience one:
+
+| Tier | Free calls/month | After |
+|---|---|---|
+| Essentials | 10,000 | — |
+| Pro | 5,000 | $32 / 1,000 |
+| Enterprise | 1,000 | $35 / 1,000 |
+| Enterprise + reviews | 1,000 | $40 / 1,000 |
+
+Requesting `rating` moves a call from Pro to Enterprise. gigpull needs rating and
+review count — they are the entire `pay_capacity` signal in local mode — so it
+operates on the **Enterprise tier with 1,000 free calls per month**.
+
+Three constraints follow, and all three are binding on the implementation:
+
+1. **Never request review text.** It is the $40 tier and gigpull does not use it —
+   review *count* is the signal, not review content. The field mask is defined in one
+   place and asserted by a test, so an accidental field addition cannot silently
+   quadruple the bill.
+2. **Pricing is per request, not per place.** One Nearby Search returns up to 20
+   places, so 1,000 free requests covers roughly 20,000 businesses per month — well
+   beyond expected usage. The free tier should cover normal operation entirely.
+3. **A hard quota cap and a budget alert are configured in Google Cloud before the
+   first real run.** A loop bug is the realistic path to an unexpected bill, and the
+   cap is the only thing that makes that failure cheap.
+
+Free tiers reset on the 1st and do not roll over.
 
 ## Error handling
 
@@ -276,6 +343,13 @@ dashboard is ever wanted — is a driver change rather than a rewrite.
   must not merge.
 - **Scorer**: pure function, therefore directly unit-testable. Table-driven cases
   pinning the ordering of hand-built companies.
+- **Rerank**: the LLM call is stubbed. Tests assert that the adjustment is clamped to
+  its range, that a `drop` verdict removes the lead while preserving its reason, that
+  the deterministic total survives alongside the adjusted one, and that a stub raising
+  an error leaves the run on deterministic scores rather than aborting it.
+- **Places field mask**: asserts the outgoing mask matches the locked Enterprise-tier
+  set and contains no review-text field. This test exists to make an accidental cost
+  increase fail in CI rather than on the bill.
 - **Probes**: run against a local fixture server serving deliberately broken pages —
   console errors, missing viewport, expired-looking footers — so assertions are stable
   and no third-party site is hit in CI.
@@ -291,8 +365,11 @@ hosted deployment; email verification services; CRM integration.
 
 1. **Dedupe quality** — the dominant failure mode of tools in this shape. Mitigated by
    explicit identity keys rather than fuzzy name matching.
-2. **Google Places cost** — the only meaningful running cost. Mitigated by caching
-   place lookups aggressively and bounding queries per run.
+2. **Google Places cost** — the only meaningful running cost, and the free tier is
+   1,000 calls/month rather than the far larger figure the retired $200 credit used to
+   imply. Mitigated by a locked field mask that never requests review text, aggressive
+   caching of place lookups, bounded queries per run, and a hard quota cap configured
+   in Google Cloud before the first real run.
 3. **Source rot** — listing sites redesign. Mitigated by fixtures, schema validation,
    and isolated per-collector failure.
 4. **Cold scoring** — the weights are guesses until labelled. Accepted, with the
