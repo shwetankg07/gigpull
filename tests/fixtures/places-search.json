@@ -1,0 +1,22 @@
+{
+  "places": [
+    {
+      "id": "ChIJanand",
+      "displayName": { "text": "Anand Sweets" },
+      "formattedAddress": "100 Feet Rd, Indiranagar, Bengaluru",
+      "rating": 4.5,
+      "userRatingCount": 892,
+      "nationalPhoneNumber": "098450 12345",
+      "primaryType": "sweet_shop"
+    },
+    {
+      "id": "ChIJkoshys",
+      "displayName": { "text": "Koshy's" },
+      "formattedAddress": "St Marks Rd, Bengaluru",
+      "rating": 4.2,
+      "userRatingCount": 5400,
+      "websiteUri": "https://www.koshys.in/menu",
+      "primaryType": "restaurant"
+    }
+  ]
+}
