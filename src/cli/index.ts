@@ -1,10 +1,12 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import { desc, eq } from "drizzle-orm";
 import { openDb, companies, leads, scores } from "../db/index.js";
 import { loadConfig } from "../config.js";
 import { runPipeline } from "../pipeline.js";
 import { createPlacesCollector } from "../collect/places.js";
+import { createMetaAdsCollector, type AdTarget } from "../collect/metaAds.js";
 import { createAnthropicClient } from "../llm/client.js";
 import { setStatus, rateLead, dueForFollowUp, type LeadStatus } from "../track/leads.js";
 
@@ -15,12 +17,20 @@ program
   .command("run")
   .description("run the full pipeline")
   .option("--categories <list>", "comma-separated local categories", "restaurant,gym,salon,clinic")
-  .action(async (o: { categories: string }) => {
+  .option("--ad-targets <file>", "JSON file of {identityKey,name,pageId} to check for active ads")
+  .action(async (o: { categories: string; adTargets?: string }) => {
     const db = openDb();
     const config = loadConfig(process.env);
+
+    const collectors = [createPlacesCollector(o.categories.split(","))];
+    if (o.adTargets) {
+      const targets = JSON.parse(readFileSync(o.adTargets, "utf8")) as AdTarget[];
+      collectors.push(createMetaAdsCollector(targets));
+    }
+
     const summary = await runPipeline(db, {
       config,
-      collectors: [createPlacesCollector(o.categories.split(","))],
+      collectors,
       llm: createAnthropicClient(config),
       now: new Date(),
     });
