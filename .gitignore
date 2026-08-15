@@ -1,0 +1,7 @@
+node_modules/
+dist/
+gigpull.db
+gigpull.db-journal
+gigpull.db-wal
+gigpull.db-shm
+.env
