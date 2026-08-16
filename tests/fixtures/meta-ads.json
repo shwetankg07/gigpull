@@ -1,0 +1,7 @@
+{
+  "data": [
+    { "id": "ad_1", "ad_delivery_start_time": "2026-08-01", "page_name": "Anand Sweets" },
+    { "id": "ad_2", "ad_delivery_start_time": "2026-08-05", "page_name": "Anand Sweets" },
+    { "id": "ad_3", "ad_delivery_start_time": "2026-08-10", "page_name": "Anand Sweets" }
+  ]
+}
