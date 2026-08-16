@@ -10,6 +10,15 @@ import { createMetaAdsCollector, type AdTarget } from "../collect/metaAds.js";
 import { createAnthropicClient } from "../llm/client.js";
 import { setStatus, rateLead, dueForFollowUp, type LeadStatus } from "../track/leads.js";
 
+// Load .env from the working directory if one exists. Node has this built in
+// since 20.12; a missing file is normal (keys may come from the shell instead),
+// so a failure here is not an error.
+try {
+  process.loadEnvFile(".env");
+} catch {
+  // no .env present — fall back to whatever is already in the environment
+}
+
 const program = new Command();
 program.name("gigpull").description("Find paid work by detecting unadvertised need");
 
