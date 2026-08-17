@@ -160,7 +160,7 @@ in this repository's docs and fixtures is invented for that reason.
 ## Development
 
 ```bash
-npm test          # 112 tests
+npm test          # 164 tests
 npm run build
 npx tsc --noEmit
 ```
