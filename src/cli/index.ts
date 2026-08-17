@@ -6,8 +6,17 @@ import { openDb, companies, leads, scores } from "../db/index.js";
 import { loadConfig } from "../config.js";
 import { runPipeline } from "../pipeline.js";
 import { createPlacesCollector } from "../collect/places.js";
+import { createOsmCollector } from "../collect/osm.js";
 import { createMetaAdsCollector, type AdTarget } from "../collect/metaAds.js";
-import { createAnthropicClient } from "../llm/client.js";
+import { createAnthropicClient, type LlmClient } from "../llm/client.js";
+import { createGeminiClient } from "../llm/gemini.js";
+import type { GigpullConfig } from "../config.js";
+
+function makeLlm(config: GigpullConfig): LlmClient {
+  return config.llmProvider === "anthropic"
+    ? createAnthropicClient(config)
+    : createGeminiClient(config);
+}
 import { setStatus, rateLead, dueForFollowUp, type LeadStatus } from "../track/leads.js";
 
 // Load .env from the working directory if one exists. Node has this built in
@@ -26,12 +35,18 @@ program
   .command("run")
   .description("run the full pipeline")
   .option("--categories <list>", "comma-separated local categories", "restaurant,gym,salon,clinic")
+  .option("--source <source>", "local discovery source: osm | places", "osm")
   .option("--ad-targets <file>", "JSON file of {identityKey,name,pageId} to check for active ads")
-  .action(async (o: { categories: string; adTargets?: string }) => {
+  .action(async (o: { categories: string; source: string; adTargets?: string }) => {
     const db = openDb();
     const config = loadConfig(process.env);
+    const categories = o.categories.split(",");
 
-    const collectors = [createPlacesCollector(o.categories.split(","))];
+    const collectors = [
+      o.source === "places"
+        ? createPlacesCollector(categories)
+        : createOsmCollector(categories),
+    ];
     if (o.adTargets) {
       const targets = JSON.parse(readFileSync(o.adTargets, "utf8")) as AdTarget[];
       collectors.push(createMetaAdsCollector(targets));
@@ -40,7 +55,7 @@ program
     const summary = await runPipeline(db, {
       config,
       collectors,
-      llm: createAnthropicClient(config),
+      llm: makeLlm(config),
       now: new Date(),
     });
     console.log(summary);
