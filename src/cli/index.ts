@@ -7,7 +7,9 @@ import { loadConfig } from "../config.js";
 import { runPipeline } from "../pipeline.js";
 import { createPlacesCollector } from "../collect/places.js";
 import { createOsmCollector } from "../collect/osm.js";
+import { createFundingCollector } from "../collect/funding.js";
 import { createMetaAdsCollector, type AdTarget } from "../collect/metaAds.js";
+import type { Collector } from "../collect/types.js";
 import { createAnthropicClient, type LlmClient } from "../llm/client.js";
 import { createGeminiClient } from "../llm/gemini.js";
 import type { GigpullConfig } from "../config.js";
@@ -34,28 +36,44 @@ program.name("gigpull").description("Find paid work by detecting unadvertised ne
 program
   .command("run")
   .description("run the full pipeline")
+  .option("--mode <mode>", "local | startup | both", "local")
   .option("--categories <list>", "comma-separated local categories", "restaurant,gym,salon,clinic")
   .option("--source <source>", "local discovery source: osm | places", "osm")
   .option("--ad-targets <file>", "JSON file of {identityKey,name,pageId} to check for active ads")
-  .action(async (o: { categories: string; source: string; adTargets?: string }) => {
+  .action(async (o: {
+    mode: string; categories: string; source: string; adTargets?: string;
+  }) => {
     const db = openDb();
     const config = loadConfig(process.env);
     const categories = o.categories.split(",");
+    const llm = makeLlm(config);
 
-    const collectors = [
-      o.source === "places"
-        ? createPlacesCollector(categories)
-        : createOsmCollector(categories),
-    ];
-    if (o.adTargets) {
-      const targets = JSON.parse(readFileSync(o.adTargets, "utf8")) as AdTarget[];
-      collectors.push(createMetaAdsCollector(targets));
+    const collectors: Collector[] = [];
+
+    if (o.mode === "local" || o.mode === "both") {
+      collectors.push(
+        o.source === "places"
+          ? createPlacesCollector(categories)
+          : createOsmCollector(categories),
+      );
+      if (o.adTargets) {
+        const targets = JSON.parse(readFileSync(o.adTargets, "utf8")) as AdTarget[];
+        collectors.push(createMetaAdsCollector(targets));
+      }
+    }
+
+    if (o.mode === "startup" || o.mode === "both") {
+      collectors.push(createFundingCollector(config.fundingFeeds, llm));
+    }
+
+    if (collectors.length === 0) {
+      throw new Error(`unknown --mode "${o.mode}" — use local, startup, or both`);
     }
 
     const summary = await runPipeline(db, {
       config,
       collectors,
-      llm: makeLlm(config),
+      llm,
       now: new Date(),
     });
     console.log(summary);

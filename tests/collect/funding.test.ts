@@ -25,7 +25,7 @@ describe("createFundingCollector", () => {
   it("turns an extracted article into a startup candidate", async () => {
     const llm: LlmClient = {
       async complete() {
-        return { company: "Kolo", website: "https://kolo.example", stage: "seed", amountUsd: 500000 };
+        return { company: "Kolo", website: "https://kolo.example", stage: "seed", amountUsd: 500000, githubOrg: "kolo-hq" };
       },
     };
     const collector = createFundingCollector([], llm);
@@ -39,11 +39,28 @@ describe("createFundingCollector", () => {
     expect(out[0]!.mode).toBe("startup");
     expect(out[0]!.identityKey).toBe("domain:kolo.example");
     expect(out[0]!.signals.find((s) => s.kind === "funded_within_180d")!.value).toBe(true);
+    expect(out[0]!.signals.find((s) => s.kind === "github_org")!.value).toBe("kolo-hq");
+  });
+
+  it("omits the github_org signal when the model is not confident", async () => {
+    const llm: LlmClient = {
+      async complete() {
+        return {
+          company: "Kolo", website: "https://kolo.example",
+          stage: "seed", amountUsd: 500000, githubOrg: null,
+        };
+      },
+    };
+    const out = [];
+    for await (const c of createFundingCollector([], llm).runFromItems!([
+      { title: "Kolo raises", link: "https://e.example/k", publishedAt: "2026-08-11T06:00:00Z" },
+    ], ctx)) out.push(c);
+    expect(out[0]!.signals.find((s) => s.kind === "github_org")).toBeUndefined();
   });
 
   it("skips an article the LLM cannot resolve to a website", async () => {
     const llm: LlmClient = {
-      async complete() { return { company: "Mystery", website: null, stage: null, amountUsd: null }; },
+      async complete() { return { company: "Mystery", website: null, stage: null, amountUsd: null, githubOrg: null }; },
     };
     const collector = createFundingCollector([], llm);
     const out = [];
