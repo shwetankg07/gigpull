@@ -63,6 +63,51 @@ const startupCollector: Collector = {
   },
 };
 
+describe("chain filter", () => {
+  const withChain: Collector = {
+    name: "chains", mode: "local",
+    async *run() {
+      for (const [key, name] of [
+        ["place:kfc", "KFC Indiranagar"],
+        ["place:ccd", "Cafe Coffee Day, Koramangala"],
+        ["place:indie", "Burma Burma Restaurant & Tea Room"],
+      ] as const) {
+        yield {
+          mode: "local", identityKey: key, name, website: null,
+          city: "Bangalore", category: "restaurant", source: "fake",
+          signals: [{ kind: "has_website", value: false }],
+          contacts: [{ type: "phone", value: "080 00000000" }],
+        };
+      }
+    },
+  };
+
+  it("kills chains before they consume rerank slots", async () => {
+    const db = openDb(":memory:");
+    let rerankCalls = 0;
+    const counting: LlmClient = {
+      async complete() {
+        rerankCalls += 1;
+        return { verdict: "keep", reason: "ok", adjustment: 0, fit: null };
+      },
+    };
+    const summary = await runPipeline(db, {
+      ...opts, collectors: [withChain], llm: counting, profile: null,
+    });
+
+    expect(summary.chainsFiltered).toBe(2);
+    // Only the independent business should have cost an LLM call.
+    expect(rerankCalls).toBe(1);
+  });
+
+  it("marks filtered chains dead so they never resurface in the list", async () => {
+    const db = openDb(":memory:");
+    await runPipeline(db, { ...opts, collectors: [withChain], profile: null });
+    const dead = db.select().from(leads).all().filter((l) => l.status === "dead");
+    expect(dead).toHaveLength(2);
+  });
+});
+
 describe("startup mode", () => {
   it("probes the github org when a company advertises one", async () => {
     const db = openDb(":memory:");

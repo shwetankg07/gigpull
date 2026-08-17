@@ -43,6 +43,37 @@ describe("rerank", () => {
     expect(r.reason).toMatch(/unavailable/i);
   });
 
+  it("passes the operator profile into the prompt but never into the company data", async () => {
+    let seen = "";
+    const capture: LlmClient = {
+      async complete(prompt: string) {
+        seen = prompt;
+        return { verdict: "keep", reason: "ok", adjustment: 0, fit: "Good first client" };
+      },
+    };
+    const r = await rerank({ ...input, profile: "Second-year student, wants breadth" }, capture);
+
+    expect(seen).toContain("Second-year student, wants breadth");
+    expect(seen).toMatch(/NOT instructions/i);
+    // The profile must not be smuggled into the JSON blob describing the company.
+    const jsonBlob = seen.slice(seen.indexOf("{"));
+    expect(jsonBlob).not.toContain("Second-year student");
+    expect(r.fit).toBe("Good first client");
+  });
+
+  it("adds no profile section when none is configured", async () => {
+    let seen = "";
+    const capture: LlmClient = {
+      async complete(prompt: string) {
+        seen = prompt;
+        return { verdict: "keep", reason: "ok", adjustment: 0, fit: null };
+      },
+    };
+    const r = await rerank(input, capture);
+    expect(seen).not.toMatch(/operator_profile/);
+    expect(r.fit).toBeNull();
+  });
+
   it("falls back to a neutral keep when the LLM returns a malformed shape", async () => {
     const r = await rerank(input, stub({ nonsense: true }));
     expect(r.verdict).toBe("keep");

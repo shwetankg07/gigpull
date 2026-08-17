@@ -9,6 +9,8 @@ import { probeWebsite } from "./enrich/webProbe.js";
 import { probeGithubOrg, type GithubProbeResult } from "./enrich/githubProbe.js";
 import { score, DEFAULT_WEIGHTS } from "./score/scorer.js";
 import { rerank } from "./score/rerank.js";
+import { isKnownChain } from "./score/chains.js";
+import { loadProfile } from "./score/profile.js";
 import { buildBrief } from "./brief/brief.js";
 import { ensureLead, setStatus } from "./track/leads.js";
 import type { LlmClient } from "./llm/client.js";
@@ -21,6 +23,8 @@ export interface PipelineOptions {
   now: Date;
   skipWebProbe?: boolean;
   minReviewCount?: number;
+  /** Operator profile text. Reaches the rerank only, never the scorer. */
+  profile?: string | null;
   /**
    * Injected so tests can drive startup-mode enrichment without hitting the
    * GitHub API. Defaults to the real probe.
@@ -40,6 +44,7 @@ export interface PipelineSummary {
   scored: number;
   reranked: number;
   dropped: number;
+  chainsFiltered: number;
   rerankAvailable: boolean;
 }
 
@@ -152,7 +157,23 @@ export async function runPipeline(
 
   // 4b. LLM rerank over the top N only
   ranked.sort((a, b) => b.total - a.total);
-  const topN = ranked.slice(0, opts.config.rerankTopN);
+
+  // Drop obvious national chains before they occupy rerank slots. Their tech is
+  // decided centrally, so a local pitch goes nowhere; the rerank would reject
+  // them anyway, but only after a paid call and after crowding out real leads.
+  let chainsFiltered = 0;
+  const eligible = ranked.filter((entry) => {
+    const name = db.select().from(companies)
+      .where(eq(companies.id, entry.companyId)).get()!.name;
+    if (!isKnownChain(name)) return true;
+    ensureLead(db, entry.companyId);
+    setStatus(db, entry.companyId, "dead", opts.now);
+    chainsFiltered += 1;
+    return false;
+  });
+
+  const profile = opts.profile === undefined ? loadProfile() : opts.profile;
+  const topN = eligible.slice(0, opts.config.rerankTopN);
   let reranked = 0;
   let dropped = 0;
   let rerankAvailable = true;
@@ -166,7 +187,7 @@ export async function runPipeline(
     const verdict = await rerank({
       name: company.name, category: company.category, city: company.city,
       reviewCount: Number(sig.review_count ?? 0),
-      hasWebsite: sig.has_website === true, defects, signals: sig,
+      hasWebsite: sig.has_website === true, defects, signals: sig, profile,
     }, opts.llm);
 
     if (/^rerank unavailable/i.test(verdict.reason)) rerankAvailable = false;
@@ -178,6 +199,7 @@ export async function runPipeline(
     db.update(scores).set({
       rerankVerdict: verdict.verdict, rerankReason: verdict.reason,
       rerankAdjustment: verdict.adjustment,
+      rerankFit: verdict.fit,
       adjustedTotal: scoreRow.total + verdict.adjustment,
       rerankedAt: iso, rerankSignalHash: JSON.stringify(sig),
     }).where(eq(scores.id, scoreRow.id)).run();
@@ -209,6 +231,6 @@ export async function runPipeline(
 
   return {
     collected: candidates.length, created, merged, enriched,
-    scored: ranked.length, reranked, dropped, rerankAvailable,
+    scored: ranked.length, reranked, dropped, chainsFiltered, rerankAvailable,
   };
 }
