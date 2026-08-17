@@ -1,0 +1,48 @@
+{
+  "version": 0.6,
+  "elements": [
+    {
+      "type": "node",
+      "id": 1234567,
+      "lat": 12.9784,
+      "lon": 77.6408,
+      "tags": {
+        "name": "Anand Sweets",
+        "shop": "confectionery",
+        "phone": "+91 98450 12345",
+        "addr:suburb": "Indiranagar"
+      }
+    },
+    {
+      "type": "way",
+      "id": 7654321,
+      "center": { "lat": 12.9752, "lon": 77.6069 },
+      "tags": {
+        "name": "Koshy's",
+        "amenity": "restaurant",
+        "website": "https://koshys.in",
+        "contact:email": "hello@koshys.in",
+        "addr:suburb": "St Marks Road"
+      }
+    },
+    {
+      "type": "node",
+      "id": 9999999,
+      "lat": 12.9,
+      "lon": 77.6,
+      "tags": { "amenity": "restaurant" }
+    },
+    {
+      "type": "node",
+      "id": 4444444,
+      "lat": 12.95,
+      "lon": 77.62,
+      "tags": {
+        "name": "Fitness First Gym",
+        "leisure": "fitness_centre",
+        "contact:website": "http://fitnessfirst.example",
+        "contact:instagram": "https://instagram.com/fitnessfirst.blr"
+      }
+    }
+  ]
+}
