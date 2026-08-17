@@ -48,6 +48,22 @@ describe("selectForEnrichment", () => {
     expect(selectForEnrichment(db, { minReviewCount: 50 })).toHaveLength(1);
   });
 
+  it("passes a company with no website even with no pay signal at all", () => {
+    // Enrichment exists to bound browser cost. A company with no website has
+    // no page to probe, so it costs nothing to let through — and "no website"
+    // is the single strongest gap signal in local mode. Sources like OSM that
+    // carry no review counts depend on this path entirely.
+    const db = openDb(":memory:");
+    addCompany(db, "place:5", [["has_website", false]]);
+    expect(selectForEnrichment(db, { minReviewCount: 50 })).toHaveLength(1);
+  });
+
+  it("still rejects a low-review company that does have a website", () => {
+    const db = openDb(":memory:");
+    addCompany(db, "place:6", [["review_count", 3], ["has_website", true]]);
+    expect(selectForEnrichment(db, { minReviewCount: 50 })).toHaveLength(0);
+  });
+
   it("skips a company already marked dead", () => {
     const db = openDb(":memory:");
     const id = addCompany(db, "place:4", [["review_count", 900]]);

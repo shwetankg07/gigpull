@@ -42,7 +42,16 @@ export function selectForEnrichment(
         .filter((s) => s.kind === "review_count")
         .map((s) => Number(JSON.parse(s.valueJson)) || 0);
       const enoughReviews = Math.max(0, ...reviewCount) >= opts.minReviewCount;
-      return hasFlag || enoughReviews;
+
+      // The filter exists to bound the cost of launching a browser per site.
+      // A company with no website has no page to probe, so letting it through
+      // costs nothing — and no-website is the strongest gap signal there is.
+      // Sources without review counts (OSM) reach the scorer only via this.
+      const noWebsite = sigs.some(
+        (s) => s.kind === "has_website" && JSON.parse(s.valueJson) === false,
+      );
+
+      return hasFlag || enoughReviews || noWebsite;
     })
     .map((c) => ({ id: c.id, mode: c.mode, name: c.name, website: c.website }));
 }
