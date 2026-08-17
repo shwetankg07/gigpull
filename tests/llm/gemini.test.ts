@@ -70,9 +70,23 @@ describe("createGeminiClient", () => {
   });
 
   it("throws a readable error when Gemini returns a non-OK status", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("quota exceeded", { status: 429 })));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("bad request", { status: 400 })));
     await expect(
       createGeminiClient(cfg).complete("hi", { type: "object", properties: {} }),
-    ).rejects.toThrow(/429/);
+    ).rejects.toThrow(/400/);
+  });
+
+  it("retries a 429 rather than failing the lead outright", async () => {
+    // Free tiers rate-limit hard; a single 429 must not cost a rerank.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("slow down", { status: 429 }))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify(geminiBody({ verdict: "keep" })), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createGeminiClient(cfg, { backoff: { attempts: 2, sleep: async () => {} } });
+    expect(await client.complete("hi", { type: "object", properties: {} }))
+      .toEqual({ verdict: "keep" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

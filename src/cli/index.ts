@@ -144,6 +144,22 @@ program
   });
 
 program
+  .command("rescore")
+  .description("re-score and re-rank what is already collected (no new fetching)")
+  .action(async () => {
+    const db = openDb();
+    const config = loadConfig(process.env);
+    const summary = await runPipeline(db, {
+      config, collectors: [], llm: makeLlm(config),
+      now: new Date(), skipCollect: true, skipWebProbe: true,
+    });
+    console.log(summary);
+    if (!summary.rerankAvailable) {
+      console.warn("rerank unavailable — see rerank_reason in the scores table");
+    }
+  });
+
+program
   .command("web")
   .description("open the lead board in a browser")
   .option("-p, --port <port>", "port to listen on", "4321")

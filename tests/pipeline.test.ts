@@ -45,6 +45,7 @@ const opts = {
   llm: dropGovernment,
   now: new Date("2026-08-16T00:00:00Z"),
   skipWebProbe: true,
+  sleep: async () => {},
 };
 
 const startupCollector: Collector = {

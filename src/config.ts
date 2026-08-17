@@ -8,8 +8,11 @@ const EnvSchema = z.object({
   GITHUB_TOKEN: z.string().min(1).optional(),
   GIGPULL_CITY: z.string().min(1).default("Bangalore"),
   GIGPULL_RERANK_TOP_N: z.coerce.number().int().positive().default(30),
+  // Requests per minute for the rerank. Gemini's free tier allows ~15; staying
+  // under it is cheaper than repeatedly hitting 429 and backing off.
+  GIGPULL_RERANK_RPM: z.coerce.number().int().positive().default(12),
   GIGPULL_LLM_PROVIDER: z.enum(["gemini", "anthropic"]).default("gemini"),
-  GIGPULL_GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash-lite"),
+  GIGPULL_GEMINI_MODEL: z.string().min(1).default("gemini-3.5-flash-lite"),
   // Bangalore. south,west,north,east — the area OSM is queried over.
   GIGPULL_BBOX: z.string().min(1).default("12.83,77.45,13.14,77.78"),
   // Identifies this client to Overpass, a free volunteer service that bans by
@@ -33,6 +36,7 @@ export interface GigpullConfig {
   githubToken?: string;
   city: string;
   rerankTopN: number;
+  rerankRpm: number;
   llmProvider: "gemini" | "anthropic";
   geminiModel: string;
   bbox: string;
@@ -50,6 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): GigpullConfig {
     githubToken: parsed.GITHUB_TOKEN,
     city: parsed.GIGPULL_CITY,
     rerankTopN: parsed.GIGPULL_RERANK_TOP_N,
+    rerankRpm: parsed.GIGPULL_RERANK_RPM,
     llmProvider: parsed.GIGPULL_LLM_PROVIDER,
     geminiModel: parsed.GIGPULL_GEMINI_MODEL,
     bbox: parsed.GIGPULL_BBOX,

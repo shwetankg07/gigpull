@@ -22,9 +22,17 @@ export interface PipelineOptions {
   llm: LlmClient;
   now: Date;
   skipWebProbe?: boolean;
+  /**
+   * Skip collection and normalisation, scoring whatever is already stored.
+   * Re-scoring is the inner loop of weight tuning and of recovering from a
+   * failed rerank; neither should cost another sweep of every source.
+   */
+  skipCollect?: boolean;
   minReviewCount?: number;
   /** Operator profile text. Reaches the rerank only, never the scorer. */
   profile?: string | null;
+  /** Injected so tests do not wait on the rerank throttle. */
+  sleep?: (ms: number) => Promise<void>;
   /**
    * Injected so tests can drive startup-mode enrichment without hitting the
    * GitHub API. Defaults to the real probe.
@@ -85,14 +93,19 @@ export async function runPipeline(
 ): Promise<PipelineSummary> {
   const iso = opts.now.toISOString();
 
-  // 1. Collect
-  const outcomes = await runCollectors(db, opts.collectors, {
-    now: opts.now, config: opts.config,
-  });
-  const candidates = outcomes.flatMap((o) => o.candidates);
+  // 1. Collect  +  2. Normalise
+  let candidateCount = 0;
+  let created = 0;
+  let merged = 0;
 
-  // 2. Normalise
-  const { created, merged } = upsertCandidates(db, candidates, opts.now);
+  if (!opts.skipCollect) {
+    const outcomes = await runCollectors(db, opts.collectors, {
+      now: opts.now, config: opts.config,
+    });
+    const candidates = outcomes.flatMap((o) => o.candidates);
+    candidateCount = candidates.length;
+    ({ created, merged } = upsertCandidates(db, candidates, opts.now));
+  }
 
   // 3. Enrich
   const targets = selectForEnrichment(db, {
@@ -178,7 +191,17 @@ export async function runPipeline(
   let dropped = 0;
   let rerankAvailable = true;
 
+  // Stay under the provider's per-minute limit rather than firing as fast as
+  // possible and burning attempts on 429s. Injectable so tests do not sleep.
+  const minIntervalMs = 60_000 / Math.max(1, opts.config.rerankRpm);
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  let lastCallAt = 0;
+
   for (const entry of topN) {
+    const since = Date.now() - lastCallAt;
+    if (lastCallAt > 0 && since < minIntervalMs) await sleep(minIntervalMs - since);
+    lastCallAt = Date.now();
+
     const company = db.select().from(companies)
       .where(eq(companies.id, entry.companyId)).get()!;
     const sig = signalMap(db, entry.companyId);
@@ -230,7 +253,7 @@ export async function runPipeline(
   }
 
   return {
-    collected: candidates.length, created, merged, enriched,
+    collected: candidateCount, created, merged, enriched,
     scored: ranked.length, reranked, dropped, chainsFiltered, rerankAvailable,
   };
 }

@@ -107,8 +107,13 @@ gigpull list [-n 20]        ranked shortlist, dead leads hidden
 gigpull show <id>           print one lead's brief
 gigpull mark <id> <status>  shortlisted | contacted | replied | dead
 gigpull rate <id> 1|-1      feeds weight tuning
+gigpull rescore             re-score + re-rank what is stored, no refetching
 gigpull followups           leads due for a nudge
 ```
+
+`rescore` matters more than it looks: re-scoring is the inner loop of weight
+tuning, and re-collecting thousands of businesses to change one weight would
+make tuning impractical.
 
 ### The board
 
@@ -160,7 +165,7 @@ in this repository's docs and fixtures is invented for that reason.
 ## Development
 
 ```bash
-npm test          # 164 tests
+npm test          # 165 tests
 npm run build
 npx tsc --noEmit
 ```
