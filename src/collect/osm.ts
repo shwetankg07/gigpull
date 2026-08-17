@@ -50,6 +50,11 @@ export function buildOverpassQuery(categories: string[], bbox: string): string {
 const ElementSchema = z.object({
   type: z.string(),
   id: z.number(),
+  // Nodes carry lat/lon directly; ways and relations carry a computed centre
+  // because `out center` was requested.
+  lat: z.number().optional(),
+  lon: z.number().optional(),
+  center: z.object({ lat: z.number(), lon: z.number() }).optional(),
   tags: z.record(z.string()).optional(),
 });
 
@@ -98,6 +103,8 @@ export function parseOverpassResponse(json: unknown): RawCandidate[] {
       category,
       source: "osm_overpass",
       sourceUrl: `https://www.openstreetmap.org/${el.type}/${el.id}`,
+      lat: el.lat ?? el.center?.lat ?? null,
+      lon: el.lon ?? el.center?.lon ?? null,
       signals: [{ kind: "has_website", value: Boolean(website) }],
       contacts,
     });

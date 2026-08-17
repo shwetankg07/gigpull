@@ -17,6 +17,8 @@ export const RawCandidateSchema = z.object({
   category: z.string().nullable().optional(),
   source: z.string().min(1),
   sourceUrl: z.string().nullable().optional(),
+  lat: z.number().nullable().optional(),
+  lon: z.number().nullable().optional(),
   signals: z.array(RawSignalSchema).default([]),
   contacts: z.array(z.object({ type: z.string(), value: z.string() })).default([]),
 });

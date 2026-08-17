@@ -62,6 +62,11 @@ produces no brief rather than a padded one.
 **track** — `new → shortlisted → contacted → replied → dead`, with day-7
 follow-ups and a thumbs rating that feeds weight tuning.
 
+Every lead also carries **Google Maps, Street View and source links**, built from
+the name and coordinates already collected — no API key, no billing. Looking at
+the storefront and the review count takes ten seconds and tells you far more than
+a database row about whether a place is worth a call.
+
 ## Two modes
 
 | | `local` | `startup` |
@@ -165,7 +170,7 @@ in this repository's docs and fixtures is invented for that reason.
 ## Development
 
 ```bash
-npm test          # 165 tests
+npm test          # 177 tests
 npm run build
 npx tsc --noEmit
 ```

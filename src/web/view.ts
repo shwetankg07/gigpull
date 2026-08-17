@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db/index.js";
 import { companies, contacts, scores, leads } from "../db/index.js";
 import type { LeadStatus } from "../track/leads.js";
+import { buildLinks, type Links } from "../core/links.js";
 
 export interface LeadView {
   companyId: number;
@@ -20,6 +21,7 @@ export interface LeadView {
   rerankReason: string | null;
   fit: string | null;
   contacts: Array<{ type: string; value: string }>;
+  links: Links;
 }
 
 /**
@@ -38,6 +40,9 @@ export function buildLeadViews(db: Db): LeadView[] {
       category: companies.category,
       mode: companies.mode,
       website: companies.website,
+      sourceUrl: companies.sourceUrl,
+      lat: companies.lat,
+      lon: companies.lon,
       status: leads.status,
       brief: leads.briefMd,
       rating: leads.rating,
@@ -48,6 +53,7 @@ export function buildLeadViews(db: Db): LeadView[] {
       breakdownJson: scores.breakdownJson,
       rerankReason: scores.rerankReason,
       fit: scores.rerankFit,
+      scoredAt: scores.scoredAt,
     })
     .from(leads)
     .innerJoin(companies, eq(leads.companyId, companies.id))
@@ -62,7 +68,18 @@ export function buildLeadViews(db: Db): LeadView[] {
     contactsByCompany.set(c.companyId, list);
   }
 
-  return rows
+  // Every pipeline run inserts a fresh scores row, so the join above yields one
+  // row per historical score. Keep only the newest per company, or the same lead
+  // appears once for every time it has ever been scored.
+  const newestByCompany = new Map<number, (typeof rows)[number]>();
+  for (const r of rows) {
+    const seen = newestByCompany.get(r.companyId);
+    if (!seen || (r.scoredAt ?? "") >= (seen.scoredAt ?? "")) {
+      newestByCompany.set(r.companyId, r);
+    }
+  }
+
+  return [...newestByCompany.values()]
     .map((r) => ({
       companyId: r.companyId,
       name: r.name,
@@ -82,6 +99,10 @@ export function buildLeadViews(db: Db): LeadView[] {
       rerankReason: r.rerankReason,
       fit: r.fit,
       contacts: contactsByCompany.get(r.companyId) ?? [],
+      links: buildLinks({
+        name: r.name, lat: r.lat, lon: r.lon,
+        sourceUrl: r.sourceUrl, website: r.website,
+      }),
     }))
     .sort((a, b) => b.total - a.total);
 }

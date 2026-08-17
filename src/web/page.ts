@@ -81,6 +81,14 @@ export const PAGE_HTML = String.raw`<!doctype html>
   .track { height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin-top: 3px; }
   .fill { height: 100%; background: var(--bar); }
   .empty { color: var(--dim); padding: 40px 20px; text-align: center; }
+  .links { display: flex; gap: 6px; flex-wrap: wrap; }
+  .links a {
+    display: inline-block; background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 11px; font-size: 12px; text-decoration: none;
+    color: var(--ink);
+  }
+  .links a:hover { border-color: var(--accent); color: var(--accent); }
+  .links a.primary { border-color: var(--accent); color: var(--accent); }
   textarea {
     width: 100%; min-height: 70px; background: var(--panel-2); color: var(--ink);
     border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit;
@@ -157,6 +165,7 @@ function render() {
           (l.city ? "<span>" + esc(l.city) + "</span>" : "") +
           (l.contacts.length ? "<span>&#9742;</span>" : "") +
           (l.website ? "" : "<span>no site</span>") +
+          (l.links.streetView ? '<span title="street view available">&#128065;</span>' : "") +
         "</div></div>").join("") +
       "</div>";
   }).join("");
@@ -212,7 +221,12 @@ function renderDetail() {
     '<div class="sec"><b>Notes</b><textarea id="notes">' + esc(l.notes ?? "") + "</textarea>" +
       '<div class="row" style="margin-top:6px"><button id="save-notes">save</button></div></div>' +
 
-    (l.website ? '<div class="sec"><a href="' + esc(l.website) + '" target="_blank" rel="noreferrer">' + esc(l.website) + "</a></div>" : "");
+    '<div class="sec"><b>Look at it first</b><div class="links">' +
+      (l.links.maps ? '<a class="primary" href="' + esc(l.links.maps) + '" target="_blank" rel="noreferrer">Google Maps</a>' : "") +
+      (l.links.streetView ? '<a href="' + esc(l.links.streetView) + '" target="_blank" rel="noreferrer">Street View</a>' : "") +
+      (l.links.source ? '<a href="' + esc(l.links.source) + '" target="_blank" rel="noreferrer">Source</a>' : "") +
+      (l.links.website ? '<a href="' + esc(l.links.website) + '" target="_blank" rel="noreferrer">Website</a>' : "") +
+    '</div><div class="sub" style="margin-top:6px">Photos, hours and reviews are on Maps &mdash; check the place is real and worth a call before you dial.</div></div>';
 
   document.querySelectorAll(".st").forEach((b) => {
     b.onclick = () => post(l.companyId, "status", { status: b.dataset.s });

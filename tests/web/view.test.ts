@@ -96,3 +96,77 @@ describe("buildLeadViews", () => {
     expect(buildLeadViews(openDb(":memory:"))).toEqual([]);
   });
 });
+
+describe("buildLeadViews links", () => {
+  it("gives every lead a maps link for eyeballing before contact", () => {
+    const db = openDb(":memory:");
+    db.insert(companies).values({
+      identityKey: "osm:node/9", mode: "local", name: "Gokul Vegetarian",
+      lat: 12.9784, lon: 77.6408,
+      sourceUrl: "https://www.openstreetmap.org/node/9",
+      createdAt: iso, updatedAt: iso,
+    }).run();
+    db.insert(leads).values({ companyId: 1 }).run();
+
+    const [v] = buildLeadViews(db);
+    expect(v!.links.maps).toContain("google.com/maps/search/");
+    expect(v!.links.streetView).toContain("map_action=pano");
+    expect(v!.links.source).toBe("https://www.openstreetmap.org/node/9");
+  });
+
+  it("omits street view when a lead has no coordinates", () => {
+    const db = openDb(":memory:");
+    db.insert(companies).values({
+      identityKey: "internshala:acme", mode: "startup", name: "Acme",
+      createdAt: iso, updatedAt: iso,
+    }).run();
+    db.insert(leads).values({ companyId: 1 }).run();
+
+    const [v] = buildLeadViews(db);
+    expect(v!.links.streetView).toBeNull();
+    expect(v!.links.maps).toContain("Acme");
+  });
+});
+
+describe("buildLeadViews score history", () => {
+  it("returns one row per lead even after several pipeline runs", () => {
+    // Each run inserts a fresh scores row. Joining naively yields one view per
+    // historical score, which surfaces as phantom duplicate leads in the UI.
+    const db = openDb(":memory:");
+    db.insert(companies).values({
+      identityKey: "osm:node/1", mode: "local", name: "Run Thrice",
+      createdAt: iso, updatedAt: iso,
+    }).run();
+    for (const [n, when] of [[100, "2026-08-01"], [110, "2026-08-02"], [130, "2026-08-03"]] as const) {
+      db.insert(scores).values({
+        companyId: 1, total: n, adjustedTotal: n, breakdownJson: "{}",
+        weightsVersion: "v1", scoredAt: when,
+      }).run();
+    }
+    db.insert(leads).values({ companyId: 1, status: "new" }).run();
+
+    const views = buildLeadViews(db);
+    expect(views).toHaveLength(1);
+  });
+
+  it("uses the most recent score, not the first", () => {
+    const db = openDb(":memory:");
+    db.insert(companies).values({
+      identityKey: "osm:node/2", mode: "local", name: "Rescored",
+      createdAt: iso, updatedAt: iso,
+    }).run();
+    db.insert(scores).values({
+      companyId: 1, total: 100, adjustedTotal: 100, breakdownJson: "{}",
+      weightsVersion: "v1", scoredAt: "2026-08-01", rerankReason: "old",
+    }).run();
+    db.insert(scores).values({
+      companyId: 1, total: 130, adjustedTotal: 135, breakdownJson: "{}",
+      weightsVersion: "v1", scoredAt: "2026-08-03", rerankReason: "current",
+    }).run();
+    db.insert(leads).values({ companyId: 1 }).run();
+
+    const [v] = buildLeadViews(db);
+    expect(v!.total).toBe(135);
+    expect(v!.rerankReason).toBe("current");
+  });
+});
