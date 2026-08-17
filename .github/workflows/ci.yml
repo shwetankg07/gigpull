@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The web probe drives a real Chromium against a local fixture server.
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx tsc --noEmit
+
+      # Includes the Places field-mask test, which fails CI if a review-text
+      # field is ever added — that mistake would otherwise show up on the bill.
+      - run: npm test
