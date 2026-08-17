@@ -8,6 +8,7 @@ import { runPipeline } from "../pipeline.js";
 import { createPlacesCollector } from "../collect/places.js";
 import { createOsmCollector } from "../collect/osm.js";
 import { createFundingCollector } from "../collect/funding.js";
+import { createInternshalaCollector } from "../collect/internshala.js";
 import { createMetaAdsCollector, type AdTarget } from "../collect/metaAds.js";
 import type { Collector } from "../collect/types.js";
 import { createAnthropicClient, type LlmClient } from "../llm/client.js";
@@ -40,8 +41,11 @@ program
   .option("--categories <list>", "comma-separated local categories", "restaurant,gym,salon,clinic")
   .option("--source <source>", "local discovery source: osm | places", "osm")
   .option("--ad-targets <file>", "JSON file of {identityKey,name,pageId} to check for active ads")
+  .option("--internship-categories <list>", "internshala categories", "computer-science")
+  .option("--internship-city <city>", "restrict internships to one city (blank = all India)", "")
   .action(async (o: {
     mode: string; categories: string; source: string; adTargets?: string;
+    internshipCategories: string; internshipCity: string;
   }) => {
     const db = openDb();
     const config = loadConfig(process.env);
@@ -64,6 +68,12 @@ program
 
     if (o.mode === "startup" || o.mode === "both") {
       collectors.push(createFundingCollector(config.fundingFeeds, llm));
+      collectors.push(
+        createInternshalaCollector(
+          o.internshipCategories.split(","),
+          o.internshipCity || null,
+        ),
+      );
     }
 
     if (collectors.length === 0) {
