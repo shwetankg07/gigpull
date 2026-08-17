@@ -30,13 +30,18 @@ export function upsertCandidates(
         website: existing.website ?? c.website ?? null,
         city: existing.city ?? c.city ?? null,
         category: existing.category ?? c.category ?? null,
+        sourceUrl: existing.sourceUrl ?? c.sourceUrl ?? null,
+        lat: existing.lat ?? c.lat ?? null,
+        lon: existing.lon ?? c.lon ?? null,
         updatedAt: iso,
       }).where(eq(companies.id, companyId)).run();
     } else {
       const row = db.insert(companies).values({
         identityKey: c.identityKey, mode: c.mode, name: c.name,
         city: c.city ?? null, category: c.category ?? null,
-        website: c.website ?? null, createdAt: iso, updatedAt: iso,
+        website: c.website ?? null, sourceUrl: c.sourceUrl ?? null,
+        lat: c.lat ?? null, lon: c.lon ?? null,
+        createdAt: iso, updatedAt: iso,
       }).returning({ id: companies.id }).get();
       companyId = row.id;
       created += 1;

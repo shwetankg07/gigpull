@@ -9,7 +9,8 @@ const DDL = `
 CREATE TABLE IF NOT EXISTS companies (
   id INTEGER PRIMARY KEY AUTOINCREMENT, identity_key TEXT NOT NULL UNIQUE,
   mode TEXT NOT NULL, name TEXT NOT NULL, city TEXT, category TEXT,
-  website TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+  website TEXT, source_url TEXT, lat REAL, lon REAL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS companies_mode_idx ON companies(mode);
 CREATE TABLE IF NOT EXISTS signals (
   id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL REFERENCES companies(id),
@@ -38,10 +39,31 @@ CREATE TABLE IF NOT EXISTS runs (
   started_at TEXT NOT NULL, finished_at TEXT, ok INTEGER, item_count INTEGER, error TEXT);
 `;
 
+/**
+ * Columns added after the first release. CREATE TABLE IF NOT EXISTS does nothing
+ * to a table that already exists, so an existing database would silently keep
+ * the old shape and every write to a new column would fail. Each entry is
+ * applied only when absent, so this is safe to run on every open.
+ */
+const ADDED_COLUMNS: Array<[table: string, column: string, ddl: string]> = [
+  ["companies", "source_url", "ALTER TABLE companies ADD COLUMN source_url TEXT"],
+  ["companies", "lat", "ALTER TABLE companies ADD COLUMN lat REAL"],
+  ["companies", "lon", "ALTER TABLE companies ADD COLUMN lon REAL"],
+  ["scores", "rerank_fit", "ALTER TABLE scores ADD COLUMN rerank_fit TEXT"],
+];
+
+function migrate(sqlite: Database.Database): void {
+  for (const [table, column, ddl] of ADDED_COLUMNS) {
+    const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === column)) sqlite.exec(ddl);
+  }
+}
+
 export function openDb(path = "gigpull.db"): Db {
   const sqlite = new Database(path);
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
   sqlite.exec(DDL);
+  migrate(sqlite);
   return drizzle(sqlite, { schema });
 }
