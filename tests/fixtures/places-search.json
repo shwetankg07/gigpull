@@ -15,7 +15,7 @@
       "formattedAddress": "St Marks Rd, Bengaluru",
       "rating": 4.2,
       "userRatingCount": 5400,
-      "websiteUri": "https://www.koshys.in/menu",
+      "websiteUri": "https://www.koshys.example/menu",
       "primaryType": "restaurant"
     }
   ]

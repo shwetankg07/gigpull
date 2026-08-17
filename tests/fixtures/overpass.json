@@ -20,8 +20,8 @@
       "tags": {
         "name": "Koshy's",
         "amenity": "restaurant",
-        "website": "https://koshys.in",
-        "contact:email": "hello@koshys.in",
+        "website": "https://koshys.example",
+        "contact:email": "hello@koshys.example",
         "addr:suburb": "St Marks Road"
       }
     },

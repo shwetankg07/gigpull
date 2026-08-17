@@ -82,7 +82,7 @@ describe("parseOverpassResponse", () => {
     const out = parseOverpassResponse(fixture);
     const koshys = out.find((c) => c.identityKey === "osm:way/7654321")!;
     expect(koshys.signals.find((s) => s.kind === "has_website")!.value).toBe(true);
-    expect(koshys.website).toBe("https://koshys.in");
+    expect(koshys.website).toBe("https://koshys.example");
 
     const gym = out.find((c) => c.identityKey === "osm:node/4444444")!;
     expect(gym.website).toBe("http://fitnessfirst.example");
@@ -94,7 +94,7 @@ describe("parseOverpassResponse", () => {
     expect(anand.contacts).toContainEqual({ type: "phone", value: "+91 98450 12345" });
 
     const koshys = out.find((c) => c.identityKey === "osm:way/7654321")!;
-    expect(koshys.contacts).toContainEqual({ type: "email", value: "hello@koshys.in" });
+    expect(koshys.contacts).toContainEqual({ type: "email", value: "hello@koshys.example" });
 
     const gym = out.find((c) => c.identityKey === "osm:node/4444444")!;
     expect(gym.contacts).toContainEqual({

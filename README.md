@@ -16,14 +16,18 @@ $ gigpull run --source osm --categories restaurant,salon
 { collected: 331, created: 331, scored: 296, reranked: 40, dropped: 5 }
 
 $ gigpull list
- 105    125  Suryawanshi
- 137    125  Aurah Spa And Salon
- 165    125  Burma Burma Restaurant & Tea Room
+ 105    125  Example Tiffin Room
+ 137    125  Example Spa & Salon
+ 165    125  Example Tea House
 
 $ gigpull show 105
-**Suryawanshi, Indiranagar, Bangalore** — no website
-Contact: 080 49653148 (phone)
+**Example Tiffin Room, Indiranagar, Bangalore** — no website
+Contact: 080 00000000 (phone)
 ```
+
+<sub>Sample output uses invented businesses. Real runs return real
+establishments and their published contact details — treat that database as
+third-party personal data and keep it out of version control.</sub>
 
 ## How it works
 
@@ -117,6 +121,14 @@ fetching, and probes run under per-host politeness delays.
 Ranking is blind to technology stack — no boost for familiar work, no penalty
 for unfamiliar. It ranks only on properties of the opportunity: ability to pay,
 urgency, size of the visible gap, and reachability.
+
+### The database holds other people's data
+
+`gigpull.db` accumulates names, phone numbers, and email addresses belonging to
+real businesses. It is gitignored, and it should stay that way — do not commit
+it, publish it, share it, or paste extracts of it anywhere public. The same goes
+for screenshots and issue reports: scrub real contact details first. Everything
+in this repository's docs and fixtures is invented for that reason.
 
 ## Known limitations
 

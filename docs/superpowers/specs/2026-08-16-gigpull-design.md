@@ -224,11 +224,14 @@ facts is suppressed rather than padded. Judgement belongs to the rerank in 4b; t
 brief stage only writes down what is already stored.
 
 ```
-Anand Sweets, Indiranagar — 4.5★, 892 reviews, no website
-Running 3 active Meta ads. Zomato-only ordering. Instagram bio → Linktree.
-Owner: +91 98xxx · anandsweets.blr@gmail.com
+Example Sweets, Indiranagar — 4.5★, 892 reviews, no website
+Running 3 active Meta ads. Aggregator-only ordering. Instagram bio → Linktree.
+Owner: +91 00000 00000 · owner@example.com
 Angle: direct WhatsApp ordering, skip the 25% aggregator cut.
 ```
+
+The example above is invented. Documentation never carries a real business's
+contact details, since anything committed here is published.
 
 The angle line states the business problem in the target's terms, not the technology
 proposed to fix it.

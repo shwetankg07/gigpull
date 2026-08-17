@@ -39,7 +39,7 @@ describe("parsePlacesResponse", () => {
     const out = parsePlacesResponse(fixture);
     const koshys = out.find((c) => c.identityKey === "place:ChIJkoshys")!;
     expect(koshys.signals.find((s) => s.kind === "has_website")!.value).toBe(true);
-    expect(koshys.website).toBe("https://www.koshys.in/menu");
+    expect(koshys.website).toBe("https://www.koshys.example/menu");
   });
 
   it("records the phone number as a contact", () => {

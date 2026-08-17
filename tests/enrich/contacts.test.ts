@@ -5,9 +5,9 @@ const html = `
 <html><body>
   <a href="mailto:owner@anand.example">Email us</a>
   <a href="tel:+919845012345">Call</a>
-  <a href="https://instagram.com/anandsweets.blr">IG</a>
-  <a href="https://www.linkedin.com/company/anand-sweets/">LinkedIn</a>
-  <a href="https://twitter.com/anandsweets">X</a>
+  <a href="https://instagram.com/example.business">IG</a>
+  <a href="https://www.linkedin.com/company/example-business/">LinkedIn</a>
+  <a href="https://twitter.com/examplebusiness">X</a>
   <a href="mailto:owner@anand.example">Duplicate</a>
 </body></html>`;
 
@@ -24,9 +24,9 @@ describe("extractContacts", () => {
 
   it("records social handles without fetching the platform", () => {
     const out = extractContacts(html, "https://anand.example");
-    expect(out).toContainEqual({ type: "instagram", value: "anandsweets.blr" });
-    expect(out).toContainEqual({ type: "linkedin", value: "anand-sweets" });
-    expect(out).toContainEqual({ type: "x", value: "anandsweets" });
+    expect(out).toContainEqual({ type: "instagram", value: "example.business" });
+    expect(out).toContainEqual({ type: "linkedin", value: "example-business" });
+    expect(out).toContainEqual({ type: "x", value: "examplebusiness" });
   });
 
   it("de-duplicates repeated contacts", () => {
