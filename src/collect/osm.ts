@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { RawCandidate } from "../core/types.js";
 import type { Collector, RunContext } from "./types.js";
 import { fetchWithBackoff, type BackoffOptions } from "../core/http.js";
+import type { ResolvedRegion } from "../core/regions.js";
 
 /**
  * Overpass mirrors, tried in order. The main instance is free, volunteer-run,
@@ -151,16 +152,25 @@ export async function fetchOverpass(
   throw new Error(`all overpass mirrors failed: ${failures.join("; ")}`);
 }
 
-export function createOsmCollector(categories: string[]): Collector {
+export function createOsmCollector(
+  categories: string[],
+  regions: ResolvedRegion[],
+): Collector {
   return {
     name: "osm_overpass",
     mode: "local",
     async *run(ctx: RunContext) {
-      const query = buildOverpassQuery(categories, ctx.config.bbox);
-      for (const candidate of parseOverpassResponse(
-        await fetchOverpass(query, ctx.config.userAgent),
-      )) {
-        yield candidate;
+      // One request per region rather than a single union query. Overpass has
+      // hard memory and time limits, and a union across several cities is both
+      // likely to time out and unkind to a free volunteer service. Sequential
+      // requests also mean one bad region does not lose the others.
+      for (const region of regions) {
+        const query = buildOverpassQuery(categories, region.bbox);
+        for (const candidate of parseOverpassResponse(
+          await fetchOverpass(query, ctx.config.userAgent),
+        )) {
+          yield candidate;
+        }
       }
     },
   };

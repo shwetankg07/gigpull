@@ -106,7 +106,8 @@ review counts, but needs a Cloud project with billing enabled.
 ## Commands
 
 ```
-gigpull run [--mode local|startup|both] [--source osm|places] [--categories a,b,c]
+gigpull run [--mode local|startup|both] [--region <spec>] [--categories a,b,c]
+gigpull regions             list built-in regions
 gigpull web [-p 4321]       lead board in a browser  <- start here
 gigpull list [-n 20]        ranked shortlist, dead leads hidden
 gigpull show <id>           print one lead's brief
@@ -119,6 +120,28 @@ gigpull followups           leads due for a nudge
 `rescore` matters more than it looks: re-scoring is the inner loop of weight
 tuning, and re-collecting thousands of businesses to change one weight would
 make tuning impractical.
+
+### Regions
+
+`--region` takes a preset (`bangalore`, `mumbai`, `jabalpur`…), the `metros`
+group, an Indian PIN code, any place name, or a raw `south,west,north,east`
+bbox. Anything without a preset is geocoded through Nominatim. PIN codes are
+looked up as postal codes rather than free text, because name search is
+ambiguous where it matters — "Sihora" returns a namesake in Damoh district,
+while `483225` gives the Jabalpur one.
+
+**There is no all-India region, deliberately.** Overpass is a free volunteer
+service with hard memory and time limits; a query spanning the country would
+time out, would be abusive even if it did not, and would return far more leads
+than anyone can work. Regions are queried one request at a time so a failure in
+one does not lose the others.
+
+> **OSM coverage collapses outside the metros.** Measured on real runs:
+> Bangalore returns ~9,200 businesses with ~1,200 reachable; Jabalpur returns
+> 28 with 1 reachable; Sihora returns **zero** — its entire bounding box holds
+> 38 named OSM objects, none of them shops. The tool is not broken there, the
+> map is empty. For tier-2 and tier-3 towns you need Google Places or local
+> knowledge, not OpenStreetMap.
 
 ### The board
 
@@ -170,7 +193,7 @@ in this repository's docs and fixtures is invented for that reason.
 ## Development
 
 ```bash
-npm test          # 177 tests
+npm test          # 192 tests
 npm run build
 npx tsc --noEmit
 ```

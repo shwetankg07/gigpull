@@ -7,6 +7,8 @@ import { loadConfig } from "../config.js";
 import { runPipeline } from "../pipeline.js";
 import { createPlacesCollector } from "../collect/places.js";
 import { createOsmCollector } from "../collect/osm.js";
+import { resolveRegions, REGIONS, METRO_GROUP } from "../core/regions.js";
+import { createGeocoder } from "../core/geocode.js";
 import { createFundingCollector } from "../collect/funding.js";
 import { createInternshalaCollector } from "../collect/internshala.js";
 import { createMetaAdsCollector, type AdTarget } from "../collect/metaAds.js";
@@ -41,12 +43,13 @@ program
   .option("--mode <mode>", "local | startup | both", "local")
   .option("--categories <list>", "comma-separated local categories", "restaurant,gym,salon,clinic")
   .option("--source <source>", "local discovery source: osm | places", "osm")
+  .option("--region <spec>", "region(s): a preset, \"metros\", a PIN code, a place name, or a raw bbox", "bangalore")
   .option("--ad-targets <file>", "JSON file of {identityKey,name,pageId} to check for active ads")
   .option("--internship-categories <list>", "internshala categories", "computer-science")
   .option("--internship-city <city>", "restrict internships to one city (blank = all India)", "")
   .action(async (o: {
-    mode: string; categories: string; source: string; adTargets?: string;
-    internshipCategories: string; internshipCity: string;
+    mode: string; categories: string; source: string; region: string;
+    adTargets?: string; internshipCategories: string; internshipCity: string;
   }) => {
     const db = openDb();
     const config = loadConfig(process.env);
@@ -56,10 +59,12 @@ program
     const collectors: Collector[] = [];
 
     if (o.mode === "local" || o.mode === "both") {
+      const regions = await resolveRegions(o.region, createGeocoder(config.userAgent));
+      console.log(`searching ${regions.length} region(s): ${regions.map((r) => r.name).join(", ")}`);
       collectors.push(
         o.source === "places"
           ? createPlacesCollector(categories)
-          : createOsmCollector(categories),
+          : createOsmCollector(categories, regions),
       );
       if (o.adTargets) {
         const targets = JSON.parse(readFileSync(o.adTargets, "utf8")) as AdTarget[];
@@ -141,6 +146,23 @@ program
   .action((companyId: string, updown: string) => {
     const db = openDb();
     rateLead(db, Number(companyId), updown === "-1" ? -1 : 1);
+  });
+
+program
+  .command("regions")
+  .description("list the built-in regions")
+  .action(() => {
+    console.log("presets:");
+    for (const name of Object.keys(REGIONS).sort()) console.log("  " + name);
+    console.log(`\ngroups:\n  metros -> ${METRO_GROUP.join(", ")}`);
+    console.log(
+      "\nAnything else is geocoded: a PIN code (483225), a place name",
+      "(\"Kochi\"), or a raw bbox (south,west,north,east).",
+    );
+    console.log(
+      "\nThere is no all-India region on purpose — Overpass would time out,",
+      "and the result would be more leads than anyone can work. Search city by city.",
+    );
   });
 
 program
