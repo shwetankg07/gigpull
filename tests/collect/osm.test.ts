@@ -19,7 +19,7 @@ describe("fetchOverpass", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ elements: [] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    expect(await fetchOverpass("[out:json];", "test-agent/1.0")).toEqual({ elements: [] });
+    expect(await fetchOverpass("[out:json];", "test-agent/1.0", { attempts: 1, sleep: async () => {} })).toEqual({ elements: [] });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]![0])).toBe(OVERPASS_ENDPOINTS[0]);
     expect(String(fetchMock.mock.calls[1]![0])).toBe(OVERPASS_ENDPOINTS[1]);
@@ -30,7 +30,7 @@ describe("fetchOverpass", () => {
       .mockRejectedValueOnce(new Error("ECONNREFUSED"))
       .mockResolvedValueOnce(new Response(JSON.stringify({ elements: [] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    expect(await fetchOverpass("[out:json];", "test-agent/1.0")).toEqual({ elements: [] });
+    expect(await fetchOverpass("[out:json];", "test-agent/1.0", { attempts: 1, sleep: async () => {} })).toEqual({ elements: [] });
   });
 
   it("sends the caller's user agent, so traffic is attributable to whoever runs it", async () => {
@@ -47,7 +47,7 @@ describe("fetchOverpass", () => {
 
   it("throws naming every mirror once all of them fail", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("busy", { status: 504 })));
-    await expect(fetchOverpass("[out:json];", "test-agent/1.0")).rejects.toThrow(/all overpass mirrors failed/);
+    await expect(fetchOverpass("[out:json];", "test-agent/1.0", { attempts: 1, sleep: async () => {} })).rejects.toThrow(/all overpass mirrors failed/);
   });
 });
 

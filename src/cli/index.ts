@@ -21,6 +21,7 @@ function makeLlm(config: GigpullConfig): LlmClient {
     : createGeminiClient(config);
 }
 import { setStatus, rateLead, dueForFollowUp, type LeadStatus } from "../track/leads.js";
+import { startWebServer } from "../web/server.js";
 
 // Load .env from the working directory if one exists. Node has this built in
 // since 20.12; a missing file is normal (keys may come from the shell instead),
@@ -140,6 +141,16 @@ program
   .action((companyId: string, updown: string) => {
     const db = openDb();
     rateLead(db, Number(companyId), updown === "-1" ? -1 : 1);
+  });
+
+program
+  .command("web")
+  .description("open the lead board in a browser")
+  .option("-p, --port <port>", "port to listen on", "4321")
+  .action(async (o: { port: string }) => {
+    const db = openDb();
+    await startWebServer(db, Number(o.port));
+    console.log(`gigpull board: http://127.0.0.1:${o.port}`);
   });
 
 program
