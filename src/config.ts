@@ -12,6 +12,13 @@ const EnvSchema = z.object({
   GIGPULL_GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash-lite"),
   // Bangalore. south,west,north,east — the area OSM is queried over.
   GIGPULL_BBOX: z.string().min(1).default("12.83,77.45,13.14,77.78"),
+  // Identifies this client to Overpass, a free volunteer service that bans by
+  // client identity. Anyone running their own copy should set this to their own
+  // contact, so their traffic is attributable to them and not to this repo.
+  GIGPULL_USER_AGENT: z
+    .string()
+    .min(1)
+    .default("gigpull/0.1 (+https://github.com/shwetankg07/gigpull)"),
 });
 
 export interface GigpullConfig {
@@ -25,6 +32,7 @@ export interface GigpullConfig {
   llmProvider: "gemini" | "anthropic";
   geminiModel: string;
   bbox: string;
+  userAgent: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): GigpullConfig {
@@ -40,5 +48,6 @@ export function loadConfig(env: NodeJS.ProcessEnv): GigpullConfig {
     llmProvider: parsed.GIGPULL_LLM_PROVIDER,
     geminiModel: parsed.GIGPULL_GEMINI_MODEL,
     bbox: parsed.GIGPULL_BBOX,
+    userAgent: parsed.GIGPULL_USER_AGENT,
   };
 }

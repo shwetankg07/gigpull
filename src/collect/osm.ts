@@ -105,7 +105,10 @@ export function parseOverpassResponse(json: unknown): RawCandidate[] {
   return out;
 }
 
-export async function fetchOverpass(query: string): Promise<unknown> {
+export async function fetchOverpass(
+  query: string,
+  userAgent: string,
+): Promise<unknown> {
   const failures: string[] = [];
 
   for (const endpoint of OVERPASS_ENDPOINTS) {
@@ -114,9 +117,11 @@ export async function fetchOverpass(query: string): Promise<unknown> {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          // Overpass is a free volunteer service and asks that clients identify
-          // themselves, so abuse traces to a tool rather than blocking everyone.
-          "User-Agent": "gigpull/0.1 (+https://github.com/shwetankg07)",
+          // Overpass is a free volunteer service that asks clients to identify
+          // themselves and bans by client identity. This comes from config so
+          // that anyone running their own copy is attributable to themselves,
+          // rather than their traffic being blamed on this repo's author.
+          "User-Agent": userAgent,
         },
         body: new URLSearchParams({ data: query }),
       });
@@ -140,7 +145,9 @@ export function createOsmCollector(categories: string[]): Collector {
     mode: "local",
     async *run(ctx: RunContext) {
       const query = buildOverpassQuery(categories, ctx.config.bbox);
-      for (const candidate of parseOverpassResponse(await fetchOverpass(query))) {
+      for (const candidate of parseOverpassResponse(
+        await fetchOverpass(query, ctx.config.userAgent),
+      )) {
         yield candidate;
       }
     },
