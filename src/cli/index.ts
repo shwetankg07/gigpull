@@ -7,7 +7,10 @@ import { loadConfig } from "../config.js";
 import { runPipeline } from "../pipeline.js";
 import { createPlacesCollector } from "../collect/places.js";
 import { createOsmCollector } from "../collect/osm.js";
+import { createFundingCollector } from "../collect/funding.js";
+import { createInternshalaCollector } from "../collect/internshala.js";
 import { createMetaAdsCollector, type AdTarget } from "../collect/metaAds.js";
+import type { Collector } from "../collect/types.js";
 import { createAnthropicClient, type LlmClient } from "../llm/client.js";
 import { createGeminiClient } from "../llm/gemini.js";
 import type { GigpullConfig } from "../config.js";
@@ -18,6 +21,7 @@ function makeLlm(config: GigpullConfig): LlmClient {
     : createGeminiClient(config);
 }
 import { setStatus, rateLead, dueForFollowUp, type LeadStatus } from "../track/leads.js";
+import { startWebServer } from "../web/server.js";
 
 // Load .env from the working directory if one exists. Node has this built in
 // since 20.12; a missing file is normal (keys may come from the shell instead),
@@ -34,28 +38,53 @@ program.name("gigpull").description("Find paid work by detecting unadvertised ne
 program
   .command("run")
   .description("run the full pipeline")
+  .option("--mode <mode>", "local | startup | both", "local")
   .option("--categories <list>", "comma-separated local categories", "restaurant,gym,salon,clinic")
   .option("--source <source>", "local discovery source: osm | places", "osm")
   .option("--ad-targets <file>", "JSON file of {identityKey,name,pageId} to check for active ads")
-  .action(async (o: { categories: string; source: string; adTargets?: string }) => {
+  .option("--internship-categories <list>", "internshala categories", "computer-science")
+  .option("--internship-city <city>", "restrict internships to one city (blank = all India)", "")
+  .action(async (o: {
+    mode: string; categories: string; source: string; adTargets?: string;
+    internshipCategories: string; internshipCity: string;
+  }) => {
     const db = openDb();
     const config = loadConfig(process.env);
     const categories = o.categories.split(",");
+    const llm = makeLlm(config);
 
-    const collectors = [
-      o.source === "places"
-        ? createPlacesCollector(categories)
-        : createOsmCollector(categories),
-    ];
-    if (o.adTargets) {
-      const targets = JSON.parse(readFileSync(o.adTargets, "utf8")) as AdTarget[];
-      collectors.push(createMetaAdsCollector(targets));
+    const collectors: Collector[] = [];
+
+    if (o.mode === "local" || o.mode === "both") {
+      collectors.push(
+        o.source === "places"
+          ? createPlacesCollector(categories)
+          : createOsmCollector(categories),
+      );
+      if (o.adTargets) {
+        const targets = JSON.parse(readFileSync(o.adTargets, "utf8")) as AdTarget[];
+        collectors.push(createMetaAdsCollector(targets));
+      }
+    }
+
+    if (o.mode === "startup" || o.mode === "both") {
+      collectors.push(createFundingCollector(config.fundingFeeds, llm));
+      collectors.push(
+        createInternshalaCollector(
+          o.internshipCategories.split(","),
+          o.internshipCity || null,
+        ),
+      );
+    }
+
+    if (collectors.length === 0) {
+      throw new Error(`unknown --mode "${o.mode}" — use local, startup, or both`);
     }
 
     const summary = await runPipeline(db, {
       config,
       collectors,
-      llm: makeLlm(config),
+      llm,
       now: new Date(),
     });
     console.log(summary);
@@ -112,6 +141,16 @@ program
   .action((companyId: string, updown: string) => {
     const db = openDb();
     rateLead(db, Number(companyId), updown === "-1" ? -1 : 1);
+  });
+
+program
+  .command("web")
+  .description("open the lead board in a browser")
+  .option("-p, --port <port>", "port to listen on", "4321")
+  .action(async (o: { port: string }) => {
+    const db = openDb();
+    await startWebServer(db, Number(o.port));
+    console.log(`gigpull board: http://127.0.0.1:${o.port}`);
   });
 
 program

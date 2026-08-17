@@ -57,6 +57,7 @@ export const scores = sqliteTable("scores", {
   rerankVerdict: text("rerank_verdict"),
   rerankReason: text("rerank_reason"),
   rerankAdjustment: real("rerank_adjustment"),
+  rerankFit: text("rerank_fit"),
   adjustedTotal: real("adjusted_total"),
   rerankedAt: text("reranked_at"),
   rerankSignalHash: text("rerank_signal_hash"),

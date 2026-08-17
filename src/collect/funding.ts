@@ -29,6 +29,7 @@ const ExtractionSchema = z.object({
   website: z.string().nullable(),
   stage: z.string().nullable(),
   amountUsd: z.number().nullable(),
+  githubOrg: z.string().nullable(),
 });
 
 const EXTRACTION_JSON_SCHEMA = {
@@ -38,8 +39,9 @@ const EXTRACTION_JSON_SCHEMA = {
     website: { type: ["string", "null"] },
     stage: { type: ["string", "null"] },
     amountUsd: { type: ["number", "null"] },
+    githubOrg: { type: ["string", "null"] },
   },
-  required: ["company", "website", "stage", "amountUsd"],
+  required: ["company", "website", "stage", "amountUsd", "githubOrg"],
   additionalProperties: false,
 } as const;
 
@@ -59,7 +61,14 @@ export function createFundingCollector(
       let extracted: z.infer<typeof ExtractionSchema>;
       try {
         const raw = await llm.complete(
-          `Extract the funded company from this headline. Return the company's own website URL if you can determine it, otherwise null.\n\n${item.title}\n${item.link}`,
+          [
+            "Extract the funded company from this headline.",
+            "Return the company's own website URL if you can determine it, otherwise null.",
+            "Return their GitHub organisation handle only if you are confident it exists, otherwise null.",
+            "",
+            item.title,
+            item.link,
+          ].join("\n"),
           EXTRACTION_JSON_SCHEMA,
         );
         extracted = ExtractionSchema.parse(raw);
@@ -84,6 +93,9 @@ export function createFundingCollector(
           { kind: "funded_within_180d", value: true },
           { kind: "funding_stage", value: extracted.stage },
           { kind: "funding_amount_usd", value: extracted.amountUsd },
+          ...(extracted.githubOrg
+            ? [{ kind: "github_org", value: extracted.githubOrg }]
+            : []),
         ],
         contacts: [],
       };

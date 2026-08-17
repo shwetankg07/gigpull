@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RawCandidate } from "../core/types.js";
 import type { Collector, RunContext } from "./types.js";
+import { fetchWithBackoff, type BackoffOptions } from "../core/http.js";
 
 /**
  * Overpass mirrors, tried in order. The main instance is free, volunteer-run,
@@ -108,12 +109,16 @@ export function parseOverpassResponse(json: unknown): RawCandidate[] {
 export async function fetchOverpass(
   query: string,
   userAgent: string,
+  backoff: BackoffOptions = { attempts: 2, baseDelayMs: 1_500 },
 ): Promise<unknown> {
   const failures: string[] = [];
 
   for (const endpoint of OVERPASS_ENDPOINTS) {
     try {
-      const res = await fetch(endpoint, {
+      // Two attempts per mirror before moving on: Overpass 504s are usually
+      // transient load, but exhausting a long backoff on a dead mirror would
+      // delay reaching a healthy one.
+      const res = await fetchWithBackoff(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -124,7 +129,7 @@ export async function fetchOverpass(
           "User-Agent": userAgent,
         },
         body: new URLSearchParams({ data: query }),
-      });
+      }, backoff);
 
       if (!res.ok) {
         failures.push(`${endpoint} -> HTTP ${res.status}`);

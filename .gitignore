@@ -13,6 +13,10 @@ dist/
 *.db-wal
 *.db-shm
 
+# Operator profile — describes you, may contain rate floors and preferences.
+# profile.example.md is the tracked template.
+profile.md
+
 # Scratch files used while driving the pipeline by hand
 smoke.ts
 e2e.ts

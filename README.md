@@ -101,13 +101,27 @@ review counts, but needs a Cloud project with billing enabled.
 ## Commands
 
 ```
-gigpull run [--source osm|places] [--categories a,b,c] [--ad-targets file.json]
+gigpull run [--mode local|startup|both] [--source osm|places] [--categories a,b,c]
+gigpull web [-p 4321]       lead board in a browser  <- start here
 gigpull list [-n 20]        ranked shortlist, dead leads hidden
 gigpull show <id>           print one lead's brief
 gigpull mark <id> <status>  shortlisted | contacted | replied | dead
 gigpull rate <id> 1|-1      feeds weight tuning
 gigpull followups           leads due for a nudge
 ```
+
+### The board
+
+`gigpull web` serves a kanban of every lead across the five statuses, bound to
+loopback only — the database holds third-party contact details and the server
+has no authentication.
+
+Each lead shows its brief, click-to-copy contacts, and a **why it ranks here**
+panel breaking the score down per axis. That panel is the reason the scorer is
+deterministic: when a lead ranks wrongly you can see which axis caused it and
+change one weight, rather than arguing with a model. It also makes structural
+gaps obvious — with OSM as the only source, every lead shows `pay capacity 0`,
+which is exactly why scores cluster.
 
 The database is created in the working directory, so run it from one place.
 
@@ -146,7 +160,7 @@ in this repository's docs and fixtures is invented for that reason.
 ## Development
 
 ```bash
-npm test          # 112 tests
+npm test          # 164 tests
 npm run build
 npx tsc --noEmit
 ```

@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS scores (
   id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER NOT NULL REFERENCES companies(id),
   total REAL NOT NULL, breakdown_json TEXT NOT NULL, weights_version TEXT NOT NULL,
   scored_at TEXT NOT NULL, rerank_verdict TEXT, rerank_reason TEXT,
-  rerank_adjustment REAL, adjusted_total REAL, reranked_at TEXT, rerank_signal_hash TEXT);
+  rerank_adjustment REAL, rerank_fit TEXT, adjusted_total REAL,
+  reranked_at TEXT, rerank_signal_hash TEXT);
 CREATE TABLE IF NOT EXISTS leads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   company_id INTEGER NOT NULL UNIQUE REFERENCES companies(id),

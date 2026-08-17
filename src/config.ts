@@ -15,6 +15,10 @@ const EnvSchema = z.object({
   // Identifies this client to Overpass, a free volunteer service that bans by
   // client identity. Anyone running their own copy should set this to their own
   // contact, so their traffic is attributable to them and not to this repo.
+  // Comma-separated RSS feeds of funding news for startup mode.
+  GIGPULL_FUNDING_FEEDS: z
+    .string()
+    .default("https://entrackr.com/feed,https://inc42.com/feed"),
   GIGPULL_USER_AGENT: z
     .string()
     .min(1)
@@ -33,6 +37,7 @@ export interface GigpullConfig {
   geminiModel: string;
   bbox: string;
   userAgent: string;
+  fundingFeeds: string[];
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): GigpullConfig {
@@ -49,5 +54,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): GigpullConfig {
     geminiModel: parsed.GIGPULL_GEMINI_MODEL,
     bbox: parsed.GIGPULL_BBOX,
     userAgent: parsed.GIGPULL_USER_AGENT,
+    fundingFeeds: parsed.GIGPULL_FUNDING_FEEDS.split(",")
+      .map((f) => f.trim())
+      .filter(Boolean),
   };
 }
