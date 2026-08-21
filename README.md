@@ -67,6 +67,59 @@ the name and coordinates already collected — no API key, no billing. Looking a
 the storefront and the review count takes ten seconds and tells you far more than
 a database row about whether a place is worth a call.
 
+## Two tabs
+
+**Local gigs** runs on your machine against SQLite, exactly as before. **Startups**
+is a deployed board over Bangalore's startup ecosystem, backed by Supabase and
+gated behind a login.
+
+They share one pipeline and one schema; the mode is a column, not a fork.
+
+### The startup tab
+
+Seeded from [bangalorestartupmap.com](https://bangalorestartupmap.com) — 885
+startups and 72 funds, with stage, sector, headcount, funding, founders and
+investors. There is no JSON API, so the collector reassembles the dataset from
+the page's inline Next.js flight stream and validates it with zod.
+
+It ranks on **the odds of a reply from somewhere that can pay**, which is a
+narrower goal than "best company" and was chosen deliberately: when every
+stage, sector and team size is acceptable, category filters rank nothing and
+leave 885 companies tied. Five axes, each measuring one thing in one
+direction:
+
+| Axis | Reads |
+|---|---|
+| `receptivity` | headcount and stage — small places answer students |
+| `pay_capacity` | funding, with headcount only as a fallback |
+| `reachability` | founder link, company LinkedIn, website |
+| `latency` | **no** advertised role, per this tool's whole premise |
+| `proximity` | distance to your nearest anchor — a bonus, never a filter |
+
+The funded-but-small sweet spot is not encoded in any axis. It emerges from
+receptivity falling as pay capacity rises, which keeps the reasoning visible
+and the weights tunable.
+
+> **A worked failure.** The first live run put Razorpay, CRED and Ola on top.
+> Reachability, funding figures and careers pages all correlate with company
+> size, and the unit tests had held those constant — so the ranking had
+> quietly become "biggest company wins". Fixed by preferring known funding
+> over inferred headcount, narrowing the reachability spread, and rewarding
+> unadvertised need instead of a visible opening.
+
+### The graph
+
+Investors and niche tags are drawn as **hub nodes**, not as lines between
+companies. Pairwise, shared-investor edges come to 4,591 — Peak XV alone backs
+53 of these companies and forms a 1,378-edge clique. As hubs it is 751, and a
+line to a labelled hub also tells you *why* two companies are connected.
+
+Live totals: **1,433 nodes, 1,769 edges**, median company degree 1. Tags above
+8 members are excluded — `saas` has 133 and says only what the sector colour
+already says.
+
+Layout is computed by the worker and stored, never simulated in the browser.
+
 ## Two modes
 
 | | `local` | `startup` |
@@ -103,10 +156,33 @@ review counts, but needs a Cloud project with billing enabled.
 > asserting no review-text field, so an accidental addition fails CI rather than
 > the bill. Set a quota cap in Google Cloud before the first real run.
 
+## Deploying the startup tab
+
+```bash
+# 1. Supabase: run the migration, then create your user by hand.
+#    There is no sign-up form — this board holds other people's contact details.
+psql "$DATABASE_URL" -f packages/core/sql/001_startup_tab.sql
+
+# 2. Fill it.
+DATABASE_URL=... GIGPULL_ANCHORS="lat,lon;lat,lon" gigpull startup-sync
+
+# 3. Deploy. render.yaml defines the web service and a weekly sync job.
+```
+
+Row level security is on for every table with no anonymous policy anywhere.
+That matters more than it looks: the browser is handed the Supabase anon key,
+which is public by design, and RLS is the only thing between that key and
+every founder's contact details in the database. `DATABASE_URL` is
+server-side only and is asserted absent from the client bundle.
+
+`GIGPULL_ANCHORS` is optional and personal — it describes where you spend your
+weekdays. It belongs in `.env`, never in the repository.
+
 ## Commands
 
 ```
 gigpull run [--mode local|startup|both] [--region <spec>] [--categories a,b,c]
+gigpull startup-sync        collect startups into Postgres, rebuild the graph
 gigpull regions             list built-in regions
 gigpull web [-p 4321]       lead board in a browser  <- start here
 gigpull list [-n 20]        ranked shortlist, dead leads hidden
@@ -193,7 +269,7 @@ in this repository's docs and fixtures is invented for that reason.
 ## Development
 
 ```bash
-npm test          # 192 tests
+npm test          # 269 tests
 npm run build
 npx tsc --noEmit
 ```

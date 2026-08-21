@@ -1,7 +1,12 @@
 node_modules/
 dist/
+.next/
+next-env.d.ts
+*.tsbuildinfo
 
-# Secrets. .env.example is the tracked template and must stay empty.
+# Secrets, and GIGPULL_ANCHORS — the places you can already be on a weekday.
+# Those coordinates are personal information; keep them out of the repository.
+# .env.example is the tracked template and must stay empty.
 .env
 .env.*
 !.env.example
