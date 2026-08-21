@@ -1,0 +1,40 @@
+{
+  "name": "@gigpull/core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "bin": { "gigpull": "./dist/cli/index.js" },
+  "exports": {
+    "./db/schema": "./src/db/schema.js",
+    "./db/schema.pg": "./src/db/schema.pg.js",
+    "./graph/*": "./src/graph/*.js",
+    "./score/*": "./src/score/*.js",
+    "./core/*": "./src/core/*.js",
+    "./collect/*": "./src/collect/*.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cli": "tsx src/cli/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "better-sqlite3": "^11.5.0",
+    "cheerio": "^1.0.0",
+    "commander": "^12.1.0",
+    "drizzle-orm": "^0.36.0",
+    "p-limit": "^6.1.0",
+    "playwright": "^1.48.0",
+    "postgres": "^3.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.7.0",
+    "drizzle-kit": "^0.28.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

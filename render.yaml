@@ -1,0 +1,47 @@
+# Render blueprint: the board, and the job that fills it.
+#
+# Two services rather than one. The web dyno serves requests and must stay
+# responsive; collection runs Playwright and a three-second graph layout, which
+# has no business happening inside a request.
+services:
+  - type: web
+    name: gigpull-web
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install && npm run build -w @gigpull/web
+    startCommand: npm run start -w @gigpull/web
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Public by design: the browser receives these. They are safe only
+      # because row level security is enabled on every table — see
+      # packages/core/sql/001_startup_tab.sql.
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      # Server-side only. Set in the Render dashboard, never committed.
+      - key: DATABASE_URL
+        sync: false
+
+  - type: cron
+    name: gigpull-startup-sync
+    runtime: node
+    plan: free
+    rootDir: .
+    # Weekly. The upstream map is updated by hand every few days, so anything
+    # more frequent is load on someone else's free site for no new data.
+    schedule: "0 3 * * 1"
+    buildCommand: npm install && npm run build -w @gigpull/core
+    startCommand: node packages/core/dist/cli/index.js startup-sync
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: GIGPULL_ANCHORS
+        sync: false
+      - key: GIGPULL_USER_AGENT
+        sync: false
